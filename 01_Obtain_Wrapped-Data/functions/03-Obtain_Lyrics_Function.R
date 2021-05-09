@@ -3,11 +3,10 @@ library(tidyverse)
 library(Rspotify)
 library(lubridate)
 library(tidytext)
-library(geniusr)
+library(genius)
 library(stringr)
 library(rvest)
 library(remotes)
-library(genius)
 library(stringi)
 
 

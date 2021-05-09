@@ -11,7 +11,9 @@ Tracks_Function <- function(user,playlists){
   }
   # Playlist Loading --------------------------------------------------------
   #getting all playlists
-  user_playlists <- getPlaylists(user,token = keys) %>% as_tibble() %>% filter(name %in% playlists,tracks>0)
+  user_playlists <- getPlaylists(user,token = keys) %>% 
+    as_tibble() %>% 
+    filter(name %in% playlists,tracks>0)
   
   
   tracks <- tibble(tracks=as.character(),id=as.character(),popularity=as.integer(),artist=as.character(),

@@ -1,3 +1,4 @@
+library(geniusr)
 # Which Songs Lyric Function Failed On ------------------------------------
 #These are the tough songs that my function couldn't get
 tough_songs <- Lyrics %>% filter(full_lyrics=="1")

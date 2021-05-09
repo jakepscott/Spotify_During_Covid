@@ -4,8 +4,12 @@ library(Rspotify)
 library(tictoc)
 library(tools)
 
-Features_Function <- function(track_data, features=
-                                c("Song Features", "Release Dates", "Genre Information", "Explicit Status of Songs")){
+Features_Function <- function(track_data, 
+                              features=
+                                c("Song Features", 
+                                  "Release Dates", 
+                                  "Genre Information", 
+                                  "Explicit Status of Songs")){
   #only works if there is at least 1 song in the track_data object
   if(nrow(track_data)==0){
     return("Sorry, no tracks in this input!")
@@ -28,14 +32,19 @@ Features_Function <- function(track_data, features=
     for(i in ids){
       tryCatch({
         Sys.sleep(.01)
-        Features<-bind_rows(Features,getFeatures(i,token=keys))},
+        Features<-bind_rows(Features,
+                            getFeatures(i,token=keys))},
         error=function(e){})
     }
     #Fixing the column names to make them pretty
-    Features <- Features %>% rename(`Duration`="duration_ms",
-                                    `Time Signature`="time_signature") %>% 
+    Features <- Features %>% 
+      rename(`Duration`="duration_ms",
+             `Time Signature`="time_signature") %>% 
       select(id:mode,valence:Duration)
-    colnames(Features) <- Features %>% colnames() %>% tools::toTitleCase()
+    
+    colnames(Features) <- Features %>%
+      colnames() %>% 
+      tools::toTitleCase()
     
     track_data <- left_join(track_data,Features) %>% 
       mutate(`Duration (Minutes)`=round(Duration/60000,1)) %>% 
@@ -43,9 +52,6 @@ Features_Function <- function(track_data, features=
       mutate(Key=ifelse(Key==-1,NA,Key),
              Mode=ifelse(Mode==1,"Major","Minor"),
              Key=as.factor(Key))
-    
-    
-    
     
     cat("\nGot Song Features!\n")
   }
@@ -62,7 +68,8 @@ Features_Function <- function(track_data, features=
     for(i in 1:length(ids)){#for each song
       tryCatch({
         Sys.sleep(.01)
-        track_info<-bind_rows(track_info,getTrack(ids[i],token=keys))
+        track_info<-bind_rows(track_info,
+                              getTrack(ids[i],token=keys))
       }, error=function(e){})
     }
     
@@ -142,7 +149,8 @@ Features_Function <- function(track_data, features=
   
   
   # Joining with Gender of Artist -------------------------------------------
-  genders <- read_rds(here("01_Obtain_Wrapped-Data/data/artist_genders.rds")) %>% rename("Artist"=artist,`Artist Gender`=genders)
+  genders <- read_rds(here("01_Obtain_Wrapped-Data/data/artist_genders.rds")) %>% 
+    rename("Artist"=artist,`Artist Gender`=genders)
   track_data <- left_join(track_data,genders)
   
   

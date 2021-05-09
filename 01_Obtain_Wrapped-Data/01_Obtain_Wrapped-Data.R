@@ -16,10 +16,12 @@ source(here("01_Obtain_Wrapped-Data/functions/05-Compare_Playlists_Function.R"))
 
 # Getting Tracks ----------------------------------------------------------
 #Get track info for my wrapped playlists
-tracks_full <- Tracks_Function(user = "jakerocksalot",playlists=c("Your Top Songs 2017",
-                                                                  "Your Top Songs 2018",
-                                                                  "Your Top Songs 2019",
-                                                                  "Your Top Songs 2020"))   
+tracks_full <- Tracks_Function(user = "jakerocksalot",
+                               playlists=c("Your Top Songs 2017",
+                                           "Your Top Songs 2018",
+                                           "Your Top Songs 2019",
+                                           "Your Top Songs 2020"))   
+#saveRDS(tracks_full,here("data/Raw_Tracks_Data.rds"))
 
 # Only keeping songs for which I don't already have data from the top 200 analysis  --------
 #What I am doing here is the following: I currently have a massive dataset of songs, with all their feature

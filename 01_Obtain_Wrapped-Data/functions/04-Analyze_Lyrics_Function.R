@@ -37,20 +37,21 @@ Lyric_Analysis_Function <- function(Lyrics){
                                               anticipation=ifelse(is.na(anticipation),0,1))
   
   # Create Functions-------------------------------------------------------
+  #Get num of words in each song
   Num_Words <- function(full_lyrics){
     full_lyrics %>% 
       tibble(word=.) %>% 
       unnest_tokens(output = "word",input = "word",token = "words") %>% 
       nrow()
-    
   }
   
+  #
   Sentiment_Function <- function(full_lyrics,total_words) {
     full_lyrics %>% 
       tibble(word=.) %>% 
       unnest_tokens(output = "word",input = "word",token = "words") %>% 
       left_join(., word_sentiment, by="word") %>% 
-      na.omit %>% 
+      na.omit() %>% 
       mutate_if(.predicate = is.double, .funs= ~sum(.)) %>% 
       mutate_if(is.double, funs(`percent` = round(./total_words*100,1))) %>% 
       head(1)
