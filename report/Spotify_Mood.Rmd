@@ -1,0 +1,64 @@
+---
+title: "Spotify Mood"
+author: "Jake Scott"
+date: "5/9/2021"
+output: 
+  html_document:
+    number_sections: true
+---
+
+```{r Load Libraries, echo=F,warning=F,message=F,include=FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+# Introduction
+
+In the previous few weeks, as the weather has begun to improve, as outdoor activities have become safer, and as vaccinations become more and more widespread, I have found myself in a starkly more positive mood than I had been in, say, December, which was the worst of the pandemic in the United States. In particular, I noticed that the songs I have been listening to recently have seemed much more upbeat than they had been even just a few months ago. The combination of this epiphany and my previous experience with the Spotify and Genius APIs led to a lightbulb moment. I could use the skills I have developed during this course to systematically explore whether my musical preferences had indeed changed, both in absolute terms and in comparison to overall popular music.
+
+Specifically, I want to explore to see whether there was a statistically significant difference between the key features of the songs I listened to in three periods; the period prior to the pandemic, the period during the worst of the pandemic here in the US, and the most recent period as cases have fallen and vaccinations have picked up. 
+
+To answer this question, I structure the report in the following way. In Section II, I discuss the data sources used in this analysis: the Spotify and Genius APIs. In Section III, I explain how I collect, clean, and transform the specific data I need on both my music preferences and those of the United States at large. In Section IV, I conduct a visualization-intensive exploratory analysis, to see whether any trends are immediately apparent. In Section V, I conduct a series of statistical tests, including Mood's Median tests and linear regressions, to investigate whether significant differences exist in my music preferences over the course of this pandemic. Finally, in Section VI, I conclude and consider next steps.
+
+# Data Sources
+
+Spotify, through its free developer API, provides rich information about each track on its platform, as well as the album it is found on. The song information includes features such as "danceability", "instrumentalness", and "valence". These are features Spotify measures in-house, and they usually fall on a zero to one scale. A full description of all of these features is presented in Table 1. The album information is slightly less detailed, but nonetheless I can extract the genre, release date, and whether the album is explicit.
+
+```{r Table 1, echo=FALSE}
+text_tbl <- data.frame(
+  Feature = c("Acousticness",
+              "Danceability",
+              "Duration",
+              "Energy",
+              "Instrumentalness",
+              "Key",
+              "Liveness",
+              "Loudness",
+              "Mode",
+              "Speechiness",
+              "Tempo",
+              "Time Signature",
+              "Valence"),
+  Description = c(
+    "A confidence measure of whether the track is acoustic.",
+    "How suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity.",
+    "The duration of the track in milliseconds.",
+    "Perceptual measure of intensity and activity.",
+    "Predicts whether a track contains no vocals.",
+    "The estimated overall key of the track.",
+    "Detects the presence of an audience in the recording. Higher liveness values represent an increased probability that the track was performed live.",
+    "The overall loudness of a track in decibels (dB).",
+    "Major or minor.",
+    "Detects the presence of spoken words in a track.",
+    "The overall estimated tempo of a track in beats per minute (BPM).",
+    "Estimated meter.",
+    "Musical positiveness conveyed by a track."
+  )
+)
+kbl(text_tbl, booktabs = T) %>%
+  kable_styling(full_width = F) %>%
+  column_spec(1, bold = T, color = "black") %>%
+  column_spec(2, width = "30em")
+```
+
+\
