@@ -21,20 +21,23 @@ Lyric_Analysis_Function <- function(Lyrics){
   word_sentiment <- nrc_data
   
   ##Getting it into useable form, so you can see which emotions a given word does or does not match with
-  word_sentiment <- word_sentiment %>% mutate(na=NA) %>% pivot_wider(names_from = sentiment, values_from = sentiment) %>%
+  word_sentiment <- word_sentiment %>% 
+    mutate(na=NA) %>% 
+    pivot_wider(names_from = sentiment, values_from = sentiment) %>%
     dplyr::select(-na)
   
   #Changing to dummy vars with 1s and 0s
-  word_sentiment <- word_sentiment %>% mutate(trust=ifelse(is.na(trust),0,1),
-                                              fear=ifelse(is.na(fear),0,1),
-                                              negative=ifelse(is.na(negative),0,1),
-                                              sadness=ifelse(is.na(sadness),0,1),
-                                              anger=ifelse(is.na(anger),0,1),
-                                              surprise=ifelse(is.na(surprise),0,1),
-                                              positive=ifelse(is.na(positive),0,1),
-                                              disgust=ifelse(is.na(disgust),0,1),
-                                              joy=ifelse(is.na(joy),0,1),
-                                              anticipation=ifelse(is.na(anticipation),0,1))
+  word_sentiment <- word_sentiment %>%
+    mutate(trust=ifelse(is.na(trust),0,1),
+           fear=ifelse(is.na(fear),0,1),
+           negative=ifelse(is.na(negative),0,1),
+           sadness=ifelse(is.na(sadness),0,1),
+           anger=ifelse(is.na(anger),0,1),
+           surprise=ifelse(is.na(surprise),0,1),
+           positive=ifelse(is.na(positive),0,1),
+           disgust=ifelse(is.na(disgust),0,1),
+           joy=ifelse(is.na(joy),0,1),
+           anticipation=ifelse(is.na(anticipation),0,1))
   
   # Create Functions-------------------------------------------------------
   #Get num of words in each song
@@ -45,7 +48,7 @@ Lyric_Analysis_Function <- function(Lyrics){
       nrow()
   }
   
-  #
+  #Count the number of sentiment-conferring words in each category for a given song
   Sentiment_Function <- function(full_lyrics,total_words) {
     full_lyrics %>% 
       tibble(word=.) %>% 
@@ -55,7 +58,6 @@ Lyric_Analysis_Function <- function(Lyrics){
       mutate_if(.predicate = is.double, .funs= ~sum(.)) %>% 
       mutate_if(is.double, funs(`percent` = round(./total_words*100,1))) %>% 
       head(1)
-    
   }
   
   # Use Functions -----------------------------------------------------------
@@ -72,7 +74,7 @@ Lyric_Analysis_Function <- function(Lyrics){
   data <- data %>% unnest(features)
   
 
-# Overall Senitment -------------------------------------------------------
+# Overall Sentiment -------------------------------------------------------
 #Make function for uncorrected
   Overall_Sentiment_Function <- function(full_lyrics) {
     full_lyrics %>% 

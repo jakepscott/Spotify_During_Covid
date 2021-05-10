@@ -2,27 +2,50 @@
 title: "Spotify Mood"
 author: "Jake Scott"
 date: "5/9/2021"
-output: 
+output:
   html_document:
-    number_sections: true
+    number_sections: yes
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
 ---
 
 ```{r Load Libraries, echo=F,warning=F,message=F,include=FALSE}
 library(tidyverse)
 library(kableExtra)
+library(knitr)
+library(here)
+library(tools)
+```
+
+```{r Load Data, include=FALSE}
+raw_track_data <- read_rds(here("data/Raw_Tracks_Data.rds"))
+nrc_data <- read_rds(here("01_Obtain_Wrapped-Data/data/nrc_data.rds"))
 ```
 
 # Introduction
 
-In the previous few weeks, as the weather has begun to improve, as outdoor activities have become safer, and as vaccinations become more and more widespread, I have found myself in a starkly more positive mood than I had been in, say, December, which was the worst of the pandemic in the United States. In particular, I noticed that the songs I have been listening to recently have seemed much more upbeat than they had been even just a few months ago. The combination of this epiphany and my previous experience with the Spotify and Genius APIs led to a lightbulb moment. I could use the skills I have developed during this course to systematically explore whether my musical preferences had indeed changed, both in absolute terms and in comparison to overall popular music.
+The last few weeks in the United States have seen the weather begin to improve, outdoor activities become safer, and vaccinations continue to become more and more widespread. In the midst of this, I have found myself in a starkly more positive mood compared to, say, December, which was the worst of the pandemic in the United States.
 
-Specifically, I want to explore to see whether there was a statistically significant difference between the key features of the songs I listened to in three periods; the period prior to the pandemic, the period during the worst of the pandemic here in the US, and the most recent period as cases have fallen and vaccinations have picked up. 
+One shift I noticed in particular is that the songs I have been listening to have seemed more upbeat and positive than they were even just a few months ago. The combination of this epiphany and my previous experience working with the Spotify and Genius APIs led to a lightbulb moment. I could use the skills I have developed during this course to systematically explore whether my musical preferences have indeed changed, both in absolute terms and in comparison to overall popular music, over the course of the pandemic.
 
-To answer this question, I structure the report in the following way. In Section II, I discuss the data sources used in this analysis: the Spotify and Genius APIs. In Section III, I explain how I collect, clean, and transform the specific data I need on both my music preferences and those of the United States at large. In Section IV, I conduct a visualization-intensive exploratory analysis, to see whether any trends are immediately apparent. In Section V, I conduct a series of statistical tests, including Mood's Median tests and linear regressions, to investigate whether significant differences exist in my music preferences over the course of this pandemic. Finally, in Section VI, I conclude and consider next steps.
+Specifically, I want to investigate whether there is a statistically significant difference between the key features and lyrics of the songs I listened to prior to pandemic versus during the pandemic. To do so, I use the Spotify and Genius APIs to collect the features and lyrical sentiment of my top 100 most listened-to songs for each year from 2017 to 2020. Then, using **using both simple visualization-based exploratory analysis as well as statistical tests such as Mood's Median and linear probability models, I find that XXXX.**
+
+The rest of this report is structured as follows. In Section II, I discuss the data sources used in this analysis. In Section III, I explain how I collect, clean, and transform the specific data I need on both my music preferences and those of the United States at large. In Section IV, I conduct a visualization-intensive exploratory analysis, to see whether any trends are immediately apparent. In Section V, I conduct a series of statistical tests, including Mood's Median tests and linear regressions, to investigate whether significant differences exist in my music preferences over the course of this pandemic. Finally, in Section VI, I conclude and consider next steps.
 
 # Data Sources
 
-Spotify, through its free developer API, provides rich information about each track on its platform, as well as the album it is found on. The song information includes features such as "danceability", "instrumentalness", and "valence". These are features Spotify measures in-house, and they usually fall on a zero to one scale. A full description of all of these features is presented in Table 1. The album information is slightly less detailed, but nonetheless I can extract the genre, release date, and whether the album is explicit.
+## Spotify API
+
+### Most listened-to songs
+
+Spotify, through its developer API, lets individuals enter a Spotify username and see that user's (public) playlists, as well as the songs that make them up. In R, this can be done with the `Rspotify` package (**CITE)**, using the `getPlaylists()` and `getPlaylistSongs()` functions. This proves extremely useful for my analysis, as it allows me to scrape my so-called "Wrapped" playlists from 2017 to 2020. These are playlists that Spotify creates each year for all users, and contains the 100 most frequently listened to songs for that user in that year (**Cite**). Thus, it allows me to see what I was listening to prior to the pandemic (2017-2019) as well as during it (2020).
+
+### Song Features
+
+Through this same API, Spotify also provides rich information about each song, as well as the album the song is from. This song information includes fairly objective features such as mode and loudness, as well as Spotify-calculated ones such as "danceability" and "valence." The full listing of these features and a brief description for each can be found in Table 1.
+
+The information Spotify provides about albums is slightly less detailed, but nonetheless usefully includes genre, release date, and whether the album the song is found on is explicit (**CITE)**.
 
 ```{r Table 1, echo=FALSE}
 text_tbl <- data.frame(
@@ -55,10 +78,149 @@ text_tbl <- data.frame(
     "Musical positiveness conveyed by a track."
   )
 )
-kbl(text_tbl, booktabs = T) %>%
-  kable_styling(full_width = F) %>%
+kbl(text_tbl, booktabs = T, caption = "Table 1") %>%
+  kable_classic(full_width = F) %>% 
+  kable_paper("hover", full_width = F) %>% 
   column_spec(1, bold = T, color = "black") %>%
   column_spec(2, width = "30em")
 ```
 
-\
+Of course, not all of these qualities that Spotify tracks are directly relevant to my research question. For example, while the valence of my music is clearly relevant to how my mood may or may not have shifted over the pandemic, it is less obvious how "speechiness" would have any relation. Thus, as I describe in more detail in later sections, I focus on the following song features: danceability, duration, energy, loudness, mode, tempo, and valence. In addition to these song-level features, I track genre and explicit-status at the album level using the same API.
+
+## Genius API
+
+To obtain the lyrics for my songs, I turn to the digital media company Genius. Genius, among other offerings, provides the lyrics of virtually every popular song stretching back decades (**CITE**). While I describe my process in more detail below, all I have to do in order to access the lyrics for my songs is to use the `genius_lyrics()` function from the `genius` package, by Josiah Parry and Nathan Barr (**CITE)**.
+
+## Word Sentiment Lexicons
+
+The lyrics, while interesting and useful, don't provide substantial information on their own. Instead, it is in tandem with sentiment analysis that they become useful for my exploration. Thus, I lean on two sentiment lexicons. First, I use the AFINN lexicon by Finn Arup Nielsen, which lists english words on a scale from very negative (-5) to very positive (+5) (**Cite**). Second, I use the NRC Word-Emotion Association Lexicon, otherwise known as EmoLex. EmoLex is a crowd-sourced lexicon that associates over 14,000 English words with eight base emotions: anger, fear, anticipation, trust, surprise, sadness, joy, and disgust, as well as two general sentiments: negative and positive (**CITE**). As I describe below, I use these two sentiment libraries to classify the sentiment of my song's lyrics over time.
+
+# Data Cleaning and Wrangling
+
+## Overall
+
+Methodologically, I choose to modularize my data acquisition and cleaning code, opting for a functional approach to the extent possible. This culminated in a single "obtain data" script that calls 5 separate functions, each of which conducts a separate stage of the data acquisition and cleaning process. I describe each concisely but thoroughly below.
+
+## Obtain Tracks
+
+The first step of the code, unsurprisingly, is to access the top songs themselves for each year since 2017. In keeping with my functional approach, I create a function that takes as inputs a Spotify username and a list of playlist titles. The function then uses the `getPlaylists()` function from `Rspotify` to get a list of the user's playlists, filters for just the ones entered as an input, and plugs the remaining playlist IDs into the `getPlaylistSongs()` function, which returns the songs in those playlists. It then binds the output together into a single tibble, with a column indicating from which playlist a given song was grabbed.
+
+While this function could be used more generally (more on this in the final section of the analysis), in my case I simply input my Spotify username and the names of the Wrapped playlists for each year, as so:
+
+    Tracks_Function(user = "hidden for privacy",
+                    playlists=c("Your Top Songs 2017",
+                                "Your Top Songs 2018",
+                                "Your Top Songs 2019",
+                                "Your Top Songs 2020"))  
+
+This results in a tibble that looks something like the following:
+
+```{r Raw Track Data, warning=FALSE, error=FALSE, message=FALSE, echo=FALSE}
+set.seed(16)
+raw_track_data %>%
+  select(Song,Artist,Album,Playlist) %>%
+  sample_n(size = 5) %>% 
+  kbl(caption = "Table 2") %>%
+  kable_classic(full_width = F) %>% 
+  kable_paper("hover", full_width = F)
+```
+
+## Obtain Song Features
+
+The next step in the data acquisition and cleaning process is to pull in the song features for all of these songs. Once again, in order to foster generalization down the road, I create a function that takes as its inputs a raw tibble of tracks as well as the features one desires to analyze (choices are: song features, release dates, genre, and explicit status). This function is a bit more involved than the one used to acquire the data set of my top tracks each year, but ultimately it follows a similar pattern. It loops through each entry in the tibble of songs, inputs the song ID into one of the Spotify API functions, and binds the results together. An example of how this looks is below:
+
+     for(i in ids){
+          tryCatch({
+            Sys.sleep(.01)
+            Features<-bind_rows(Features,
+                                getFeatures(i,token=keys))},
+            error=function(e){})
+        }
+
+This specific loop takes the i^th^ song ID from the raw tracks tibble, plugs it into the `getFeatures()` function from the `Rspotify` package, and binds the results to a data frame called "Features." Thus, when the loop concludes, it has a data frame of song features for each song in the raw input.
+
+While otherwise a fairly standard loop, there are two quick questions one could raise about it. Why does it have `Sys.sleep()` in it, and why does it use a for loop rather than, say, a `map()` call? Indeed, using `map` would allow for parallelization, using the `future` and `furrr` packages (**Cite)**. Both questions have the same answer: if I query the API too frequently in a short a time, it both causes errors and is poor "web scraping manners," so to speak. Thus, I sacrifice speed in order to avoid errors and be respectful of the service.
+
+The function is made up of 4 such loops, all essentially identical besides slightly different function calls to the API (e.g. `getAlbumInfo()` rather than `getFeatures()`). Using these loops and a series of left joins, the function ultimagtely outputs a tibble where each row is a song and each column is one of a set of song or album features, including danceability, duration, energy, key, loudness, mode, tempo, and valence on the song-level and the genre and explicit-status on the album-level.
+
+## Lyrics
+
+The next function in this process is used to obtain the lyrics for each song. It simply takes a data set of song names paired with the artist that sang it, and plugs each song-artist pair into the `genius_lyrics()` function from the `genius` package (**Cite**). The only real wrinkle here was properly formatting the song and artist names so that they worked in the `genius_lyrics()` function. To do so, I had to remove punctuation and accent marks, remove extra information that would be within parenthesis or after hyphens, and convert all the name strings to Latin-ASCII format. Once I did so, the function worked for around 90% of songs in the data. For the 20 or so song-artist pairs that did not work in the function for one reason or another, I manually obtained the lyrics by looking up the song on Genius, copying the URL, and plugging the URL into the `get_lyrics_url()` function from the `geniusr` package (**Cite**). This left me with a data set of each of my most frequently listened to songs over the years along with their lyrics.
+
+## Sentiment
+
+As I mentioned in the previous section, having a column that holds the lyrics for each song is interesting, but not particularly useful for my analysis (though avenues for future research include looking at word counts and relative word importance over time). What I need is the sentiment of each song, based on those lyrics. This is where my fourth function and the sentiment lexicons come into play.
+
+As I discussed above, I use two lexicons, Afinn and EmoLex. Once again, I lean on a functional approach to join the sentiment information in these lexicons with each song in my main data set. Specifically, I create a function that takes the data set of songs as an input, loops through each song, extracts the lyrics from the lyric column, uses the lexicons to quantify the sentiment on a series of dimensions for that given song, and then attaches those sentiment columns to each song to the data. This is a high level overview that warrants further explanation.
+
+I will focus first on the EmoLex data, since using that data is a bit more of an involved process. The Emolex lexicon is stored in a word-sentiment pair format, where each given word-sentiment pair is its own row (see Table 3). This is certainly not tidy data. A single observation, or word in this case, is spread across multiple rows.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+nrc_data %>%
+  head(8) %>% 
+  rename("Word"=word,"Sentiment"=sentiment) %>% 
+  kbl(caption = "Table 3") %>%
+  kable_classic(full_width = F) %>% 
+  kable_paper("hover", full_width = F)
+```
+
+To ameliorate this, I use `pivot_longer()` and some mutating to tidy up the sentiment data, making it such that each row is a single word and each column is a different sentiment, with the entry for a given cell indicating whether that word is classified as conferring that sentiment. For example, as seen below in the subset of the data represented by Table 4, "abandon" confers fear, negativity, and sadness, hence it has 1's for those entries. But it does not confer trust, so it has a 0 for that entry.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE, cache=TRUE}
+word_sentiment <- nrc_data %>% 
+    mutate(na=NA) %>% 
+    pivot_wider(names_from = sentiment, values_from = sentiment) %>%
+    dplyr::select(-na)
+  
+  #Changing to dummy vars with 1s and 0s
+  word_sentiment <- word_sentiment %>%
+    mutate(trust=ifelse(is.na(trust),0,1),
+           fear=ifelse(is.na(fear),0,1),
+           negative=ifelse(is.na(negative),0,1),
+           sadness=ifelse(is.na(sadness),0,1),
+           anger=ifelse(is.na(anger),0,1),
+           surprise=ifelse(is.na(surprise),0,1),
+           positive=ifelse(is.na(positive),0,1),
+           disgust=ifelse(is.na(disgust),0,1),
+           joy=ifelse(is.na(joy),0,1),
+           anticipation=ifelse(is.na(anticipation),0,1))
+  
+  names(word_sentiment) <- word_sentiment %>% 
+    names() %>% 
+    toTitleCase()
+  
+  word_sentiment %>% 
+    select(Word:Sadness) %>% 
+    head(8) %>% 
+    kbl(caption = "Table 3") %>%
+    kable_classic(full_width = F) %>% 
+    kable_paper("hover", full_width = F)
+```
+
+With this tidied lexicon data in hand, I am able to connect sentiment values to my songs. To do so, I create a sub-function which takes as an input a single string of lyrics, uses the `unnest_tokens()` function from the `tidytext` package on that string to create a data set where each row is a word, joins this to the sentiment data based on word, and finally calculates the percent of words falling into each sentiment category. For example, if the lyrics for a given song contained 150 words, 30 of which conferred trust, the function would return a data set containing a column called "trust percent" that has a value of 0.20. I loop this function over every song in my data, generating, for each song, a set of columns indicating what percent of words fall into each of the given sentiment categories (**Insert table**).
+
+The process is similar but simpler for the Afinn data. The Afinn data is already tidy, with a column for each unique word and a column for the valence of that given word, on a scale from -5 to 5. I create another sub-function that, like above, unnests an inputted string of lyrics, joins this data to the Afinn sentiment data, and then calculates the mean sentiment across all words in that song. The only minor adjustment I make with this lexicon is to account for negation words. Specifically, if a given word is preceded by not, no, never, won't, don't, or can't, I flip the sign. So, for example, if the word phrase "I do not abhor him" appears, the word abhor will get a value of +3 rather than -3, to better match its contextual meaning. **Cite Julie Silge**. This sub-function is called on each row of the song data frame, and thus creates a new column where each entry is the mean sentiment of all the words in that given song.
+
+## Aggregation
+
+The last function called by my "obtain data" script is an aggregation function. This is a rather simple function, and probably did not need to be a function at all except for the fact that, in the long term, I want to have this script work for any data inputted, not just the data used in this analysis. Hence, a function is useful for generalization.
+
+All this aggregation function actually does is group by each playlist, and then summarize all of the song feature and lyrical sentiment columns. The only wrinkle is that it takes the median for non-binary numeric columns such as loudness, and takes the mean for binary indicatory columns such as mode (which ends up given the percent of songs that are in major for a given playlist, for example). It is worth noting that the aggregated data set this generates is separate from the full data frame, which has each song as its own row and then a series of feature columns. This data is used primarily in the exploratory analysis, whereas the full data is used in the statistical analysis.
+
+## Top Songs in the US
+
+One additional component I began work on, though on which have hit a roadblock, is looking at how the characteristics of music popular in the US as a whole have shifted over time during the pandemic. Spotify makes this possible, in theory, by releasing the top 200 songs (by total number of streams) each day for the US. Given the function-based workflow I described above, it is in theory perfectly possible collect the raw data on these most popular songs, use it as input in the functions, and get the same output as I do for my wrapped data: a full data set where each row is a song and each column is a feature as well as an aggregated data set, aggregating by year, for example. In fact, I did this very thing with data up to December 2020. However, to acquire the most popular songs for each day, I used `RSelenium`, a web scraping package (**Cite**). This would not be an issue, except for the fact that it seems Spotify has very recently reconfigured the top 200 song page to be inhospitable for scraping tools. Both because it is now very difficult to scrape the data at all, and because it seems Spotify no longer wants individuals to do so, I have paused on this component of the project. Nonetheless, I did collect the top 200 songs each day from January 2017 to December 2020, and put that data through the work flow described above.
+
+# Exploratory Analysis
+
+## My Top Songs Versus Popular Music
+
+## Granular View of Popular Music Over Time
+
+# Modeling
+
+## Method
+
+## Results
+
+# Conclusion
