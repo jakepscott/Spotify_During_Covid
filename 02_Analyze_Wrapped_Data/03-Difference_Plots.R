@@ -9,6 +9,7 @@ library(ggiraph)
 library(ggtext)
 library(ggiraph)
 library(glue)
+library(patchwork)
 windowsFonts(`Roboto`=windowsFont("Roboto Condensed"))
 theme_set(theme_minimal(base_size = 12,base_family = "Roboto"))
 
@@ -66,12 +67,12 @@ Feats_Data <- Full_Comparison %>%
   ggplot(aes(x=fct_reorder(Feature,diff_in_diff),y=diff_in_diff)) +
   geom_col_interactive(aes(tooltip=str_wrap(glue("The difference in {tolower(Feature)} between my music and popular music \nwent {up_or_down}  by {round(diff_in_diff,2)}% between 2019 and 2020"),25)),
                        fill="#1DB954") +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 30)) +
   labs(x=NULL,
-       y="Difference in Difference \n(% change in difference from 2019 to 2020)") +
+       y="Difference in Difference") +
   coord_flip() 
 
-girafe(ggobj = diff_in_diff_Feats_Data_plot)
+#girafe(ggobj = diff_in_diff_Feats_Data_plot)
 
 
 # Genres ------------------------------------------------------------------
@@ -100,10 +101,10 @@ diff_in_diff_genre_plot <- diff_in_diff_genre %>%
                        fill="#1DB954") +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
   labs(x=NULL,
-       y="Difference in Difference \n(Percentage point change in difference from 2019 to 2020)") +
+       y="Difference in Difference") +
   coord_flip() 
 
-girafe(ggobj = diff_in_diff_genre_plot)
+#girafe(ggobj = diff_in_diff_genre_plot)
 
 
 # Sentiments --------------------------------------------------------------
@@ -130,13 +131,21 @@ sentiments_diff_in_diff <- sentiments %>%
 sentiments_diff_in_diff <- sentiments_diff_in_diff %>% 
   mutate(up_or_down=ifelse(diff_in_diff>=0,"up","down"))
 
-sentiments_diff_in_diff <- sentiments_diff_in_diff %>% 
+sentiments_diff_in_diff_plot <- sentiments_diff_in_diff %>% 
   ggplot(aes(x=fct_reorder(Sentiment,diff_in_diff),y=diff_in_diff)) +
   geom_col_interactive(aes(tooltip=str_wrap(glue("The difference in percent of words in the {tolower(Sentiment)} sentiment category between my music and popular music \nwent {up_or_down}  by {round(diff_in_diff,2)} percentage points between 2019 and 2020"),25)),
                        fill="#1DB954") +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
   labs(x=NULL,
-       y="Difference in Difference \n(Percentage point change in difference from 2019 to 2020)") +
+       y="Difference in Difference") + #\n(Percentage point change in difference from 2019 to 2020)
   coord_flip() 
 
-girafe(ggobj = sentiments_diff_in_diff)
+#girafe(ggobj = sentiments_diff_in_diff_plot)
+
+# Joined Plot -------------------------------------------------------------
+
+Joined_plot <- diff_in_diff_Feats_Data_plot+ diff_in_diff_genre_plot + sentiments_diff_in_diff_plot + plot_layout(ncol = 2)
+#diff_in_diff_Feats_Data_plot / (sentiments_diff_in_diff_plot | diff_in_diff_genre_plot)
+
+
+girafe(ggobj = Joined_plot)
