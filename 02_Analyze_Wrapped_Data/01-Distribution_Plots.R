@@ -1,8 +1,6 @@
 # Loading Libraries and Data-------------------------------------------------------
 library(tidyverse)
-library(ggridges)
 library(here)
-library(patchwork)
 library(stringr)
 library(scales)
 library(tools)

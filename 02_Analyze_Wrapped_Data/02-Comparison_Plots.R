@@ -12,8 +12,6 @@ library(glue)
 windowsFonts(`Roboto`=windowsFont("Roboto Condensed"))
 theme_set(theme_minimal(base_size = 12,base_family = "Roboto"))
 
-
-
 # Getting Wrapped Data ----------------------------------------------------
 #Playlist comparison wrapped data
 Comparison_Wrapped <- read_rds(here("data/Wrapped_Playlist_Data.rds"))
@@ -50,25 +48,24 @@ Feats_Data <- Full_Comparison %>%
   pivot_longer(`Median Danceability`:`Percent of Songs That Are Explicit`,names_to="Feature") %>% 
   mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs"))
 
-Feats_Data_plot <- Feats_Data %>% 
-  ggplot(aes(x=Playlist,y=value)) +
+Feats_Data_Plot <- Feats_Data %>% 
+  ggplot(aes(x=Playlist,y=value,group=Wrapped)) +
   geom_vline(xintercept = 2019) +
-  geom_line(aes(color=Wrapped,group=Wrapped),size=1.25) +
+  geom_line(aes(color=Wrapped),size=1.5) +
   geom_point_interactive(aes(color=Wrapped,
                              tooltip=glue("{Feature} was {value} in {Playlist} for {whose_songs}")),
                          size=3) +
   scale_color_manual(values=c("#A9A9A9","#1DB954")) +
-  scale_y_continuous(expand = expansion(mult =  0.1)) +
   facet_wrap(~Feature,scales = "free_y",
              labeller = labeller(Feature = label_wrap_gen(10))) +
-  labs(title="How <span style='color: #1DB954'>**my**</span> music compares to <span style='color: #A9A9A9'>**popular**</span> <br/>music on Spotify") +
+  labs(title="<span style='color: #1DB954'>**My**</span> most common genres versus <br/>which were <span style='color: #A9A9A9'>**popular**</span>") +
   theme(plot.title = element_markdown(size = rel(2)),
         axis.title = element_blank(),
         plot.title.position = "plot",
-        strip.text = element_text(size=rel(0.7)),
+        strip.text = element_text(size=rel(.8)),
         legend.position = "none")
 
-ggiraph(ggobj = Feats_Data_plot)
+girafe(ggobj = Feats_Data_Plot)
 
 # Genres ------------------------------------------------------------------
 genres <- Full_Comparison %>% 
@@ -155,3 +152,4 @@ Overall_sentiment_plot <- Full_Comparison %>%
         plot.subtitle = element_text(colour = "grey70"))
 
 girafe(ggobj = Overall_sentiment_plot)
+
