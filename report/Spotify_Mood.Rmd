@@ -2,10 +2,10 @@
 title: "Spotify Mood"
 author: "Jake Scott"
 date: "5/9/2021"
-output:
+output: 
   html_document:
-    number_sections: yes
-  pdf_document: default
+    number_sections: TRUE
+    fig_caption: TRUE
 editor_options:
   chunk_output_type: console
 ---
@@ -16,11 +16,49 @@ library(kableExtra)
 library(knitr)
 library(here)
 library(tools)
+library(stringr)
+library(scales)
+library(ggiraph)
+library(glue)
+library(ggtext)
+library(patchwork)
+windowsFonts(`Roboto`=windowsFont("Roboto Condensed"))
+theme_set(theme_minimal(base_size = 12,base_family = "Roboto"))
 ```
 
-```{r Load Data, include=FALSE}
+```{r Load Data, include=FALSE, cache=TRUE}
 raw_track_data <- read_rds(here("data/Raw_Tracks_Data.rds"))
 nrc_data <- read_rds(here("01_Obtain_Wrapped-Data/data/nrc_data.rds"))
+data <- read_rds(here("data/Full_Wrapped_Feat_Lyrics_Data.rds"))
+comparison_data <- read_rds(here("data/Wrapped_Playlist_Data.rds"))
+comparison_data <- comparison_data %>% rename("Median Loudness (dB)"=`Median Loudness`,
+                                              "Median Tempo (BPM)"=`Median Tempo`,
+                                              "Percent of Songs That Are Explicit"=`Percent Explicit`)
+
+# Getting Wrapped Data ----------------------------------------------------
+#Playlist comparison wrapped data
+Comparison_Wrapped <- read_rds(here("data/Wrapped_Playlist_Data.rds"))
+Comparison_Wrapped <- Comparison_Wrapped %>% 
+  rename("Median Loudness (dB)"=`Median Loudness`,
+         "Median Tempo (BPM)"=`Median Tempo`,
+         "Percent of Songs That Are Explicit"=`Percent Explicit`) %>% 
+  mutate(Wrapped="Yes",
+         Playlist=parse_number(Playlist))
+
+
+# Getting Top 200 Data -----------------------------------------------------
+#Playlist comparison top 200 data
+Comparison_Top_200 <- read_rds(here("data/Top200_Weighted_Playlist_Data.rds")) %>% 
+  rename("Median Loudness (dB)"=`Median Loudness`,
+         "Median Tempo (BPM)"=`Median Tempo`,
+         "Percent of Songs That Are Explicit"=`Percent Explicit`) %>% 
+  mutate(Wrapped="No",
+         `Median Years Since Release (Adj)`=`Median Days Since Release (Adj)`/365) %>% 
+  select(-`Median Days Since Release (Adj)`) %>% 
+  mutate(Playlist=as.numeric(Playlist))
+
+# Joining Wrapped and Top 200 ---------------------------------------------
+Full_Comparison <- Comparison_Wrapped %>% bind_rows(Comparison_Top_200)
 ```
 
 # Introduction
@@ -213,9 +251,313 @@ One additional component I began work on, though on which have hit a roadblock, 
 
 # Exploratory Analysis
 
-## My Top Songs Versus Popular Music
+## Overall Distributions
 
-## Granular View of Popular Music Over Time
+```{r Feat Distribution, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+data %>% 
+  select(Danceability,Energy,Loudness,Valence:`Duration (Minutes)`) %>%
+  pivot_longer(cols = everything(),names_to = "Feature",values_to = "Value") %>% 
+  ggplot(aes(Value)) +
+  geom_density(fill="lightblue") +
+  facet_wrap(~Feature, scales = "free") + 
+  labs(y=NULL,
+       title = "Most song features appear roughly normally distributed") +
+  theme(plot.title.position = "plot")
+```
+
+```{r Lyric Sentiment Distribution, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+lyrical_sent <- data %>% 
+  select(trust_percent:overall_sentiment_corrected) %>%
+  select(-overall_sentiment) 
+
+names(lyrical_sent) <- names(lyrical_sent) %>% str_replace_all(.,"_"," ") %>% toTitleCase()
+
+lyrical_sent %>% 
+  rename("Afinn Sentiment"=`Overall Sentiment Corrected`) %>% 
+  pivot_longer(cols = everything(),names_to = "Feature",values_to = "Value") %>% 
+  ggplot(aes(Value)) +
+  geom_density(fill="lightblue") +
+  scale_x_continuous(labels = function(x){round(x,1)}) +
+  facet_wrap(~Feature, scales = "free",
+             labeller = labeller(Feature = label_wrap_gen(10))) +
+  labs(y=NULL,
+       title = "The distribution of lyrical sentiments appear roughly normally distributed",
+       subtitle = "Though most categories exhibit some degree of right skew") +
+  theme(plot.title.position = "plot",
+        axis.text.x = element_text(size=rel(0.8)),
+        plot.subtitle = element_text(color="grey50"))
+```
+
+## Distribution by Year
+
+```{r Feat Distribution by Year, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+data %>% 
+  select(Playlist,Danceability,Energy,Loudness,Valence:`Duration (Minutes)`) %>%
+  mutate(Playlist=parse_number(Playlist) %>% as.character()) %>% 
+  pivot_longer(cols = -Playlist,names_to = "Feature",values_to = "Value") %>% 
+  filter(Playlist=="2019" | Playlist=="2020") %>% 
+  ggplot(aes(Value)) +
+  geom_density(aes(group=Playlist, fill=Playlist),alpha=.5) +
+  scale_fill_manual(values=c("#A9A9A9","#1DB954")) +
+    facet_wrap(~Feature, scales = "free",
+             labeller = labeller(Feature = label_wrap_gen(10))) +
+  labs(title="Distribution of feature values in <span style='color: #A9A9A9'>**2019**</span> versus <span style='color: #1DB954'>**2020**</span>",
+       subtitle = "Perhaps surprisingly, the features seem to differ at most marginally by year") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        plot.subtitle = element_text(color="grey50"),
+        axis.title = element_blank(),
+        plot.title.position = "plot",
+        strip.text = element_text(size=rel(0.7)),
+        legend.position = "none")
+```
+
+```{r Lyric Sentiment Distribution by Year, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+lyrical_sent <- data %>% 
+  select(Playlist,trust_percent:overall_sentiment_corrected) %>%
+  mutate(Playlist=parse_number(Playlist) %>% as.character()) %>% 
+  select(-overall_sentiment) 
+
+names(lyrical_sent) <- names(lyrical_sent) %>% str_replace_all(.,"_"," ") %>% toTitleCase()
+
+lyrical_sent %>% 
+  rename("Afinn Sentiment"=`Overall Sentiment Corrected`) %>% 
+  pivot_longer(cols = -Playlist,names_to = "Feature",values_to = "Value") %>% 
+  filter(Playlist=="2019" | Playlist=="2020") %>% 
+  ggplot(aes(Value)) +
+  geom_density(aes(group=Playlist, fill=Playlist),alpha=.5) +
+  scale_x_continuous(labels = function(x){round(x,1)}) +
+  scale_fill_manual(values=c("#A9A9A9","#1DB954")) +
+  facet_wrap(~Feature, scales = "free",
+             labeller = labeller(Feature = label_wrap_gen(10))) +
+  labs(title="Lyrical sentiments in <span style='color: #A9A9A9'>**2019**</span> versus <span style='color: #1DB954'>**2020**</span>",
+       subtitle = "Perhaps surprisingly, lyrical sentiments seem to differ at most marginally by year, besides a modestly \nstronger right skew in 2020 for some features") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        plot.subtitle = element_text(color="grey50"),
+        axis.title = element_blank(),
+        plot.title.position = "plot",
+        strip.text = element_text(size=rel(0.7)),
+        legend.position = "none")
+```
+
+## My Top Songs Versus Top Songs in US
+
+```{r Feats, Mine Versus Pop, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+Feats_Data <- Full_Comparison %>% 
+  select(Wrapped,Playlist,`Median Danceability`:`Percent in Major`,
+         `Average Words Per Song`,
+         `Percent of Songs That Are Explicit`) %>% 
+  pivot_longer(`Median Danceability`:`Percent of Songs That Are Explicit`,names_to="Feature") %>% 
+  mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs"))
+
+Feats_Data %>% 
+  ggplot(aes(x=Playlist,y=value,group=Wrapped)) +
+  geom_vline(xintercept = 2019) +
+  geom_line(aes(color=Wrapped),size=1.5) +
+  geom_point_interactive(aes(color=Wrapped,
+                             tooltip=glue("{Feature} was {value} in {Playlist} for {whose_songs}")),
+                         size=2) +
+  scale_color_manual(values=c("#A9A9A9","#1DB954")) +
+  facet_wrap(~Feature,scales = "free_y",
+             labeller = labeller(Feature = label_wrap_gen(22))) +
+  labs(title="Features of <span style='color: #1DB954'>**my**</span> top songs versus the features of <span style='color: #A9A9A9'>**popular**</span> songs") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        axis.title = element_blank(),
+        plot.title.position = "plot",
+        strip.text = element_text(size=rel(.8)),
+        legend.position = "none")
+```
+
+```{r Genres, Mine Versus Pop, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+genres <- Full_Comparison %>% 
+  select(Wrapped, Playlist,`Percent Hip Hop`,`Percent Pop`,
+         `Percent Rap`, `Percent Trap`, `Percent Country`,
+         `Percent Rock`, `Percent R&B`, 
+         `Percent Other`) 
+
+genres %>% 
+  pivot_longer(cols=`Percent Hip Hop`:`Percent Other`,
+               names_to="Genre",
+               values_to="Percent") %>% 
+  mutate(Genre_label=str_remove(Genre,"Percent ")) %>% 
+  mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs")) %>% 
+  ggplot(aes(x=Playlist,y=Percent,group=Wrapped)) +
+  geom_vline(xintercept = 2019) +
+  geom_line(aes(color=Wrapped),size=1.5) +
+  geom_point_interactive(aes(color=Wrapped,
+                             tooltip=glue("{round(Percent,2)}% of {whose_songs} were classified as {Genre_label} in {Playlist}")),
+                         size=3) +
+  scale_color_manual(values=c("#A9A9A9","#1DB954")) +
+  facet_wrap(~Genre,scales = "free_y") +
+  labs(title="<span style='color: #1DB954'>**My**</span> most common genres versus which were <span style='color: #A9A9A9'>**popular**</span>") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        axis.title = element_blank(),
+        plot.title.position = "plot",
+        strip.text = element_text(size=rel(.8)),
+        legend.position = "none")
+```
+
+```{r Sentiments, Mine Versus Pop, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+sentiments <- Full_Comparison %>% 
+  select(Wrapped,Playlist,
+         `Percent of Words in Trust Category`:`Percent of Words in Anticipation Category`)
+names(sentiments) <- names(sentiments) %>% 
+  str_replace("Percent of Words in ","") %>% 
+  str_replace(" Category","")
+
+
+sentiments %>% 
+  pivot_longer(cols=Trust:Anticipation,
+               names_to="Sentiment",
+               values_to="Percent") %>% 
+  mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs")) %>% 
+  ggplot(aes(x=Playlist,y=Percent,group=Wrapped)) +
+  geom_vline(xintercept = 2019) +
+  geom_line(aes(color=Wrapped),
+            size=1.5) +
+  geom_point_interactive(aes(color=Wrapped,
+                             tooltip=glue("{round(Percent,2)}% of words in {whose_songs} were in the {tolower(Sentiment)} category in {Playlist}")),
+                         size=2) +
+  scale_color_manual(values=c("#A9A9A9","#1DB954")) +
+  facet_wrap(~Sentiment,scales = "free_y") +
+  labs(title="Sentiments of <span style='color: #1DB954'>**my**</span> music versus <span style='color: #A9A9A9'>**popular**</span> music",
+       subtitle = "Using EmoLex Data") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        plot.subtitle = element_text(colour = "grey70"),
+        axis.title = element_blank(),
+        plot.title.position = "plot",
+        strip.text = element_text(size=rel(.8)),
+        legend.position = "none")
+```
+
+```{r Afinn, Mine Versus Pop, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+Full_Comparison %>% 
+  select(Wrapped, Playlist, "Average Overall Sentiment"=`Average Corrected Sentiment`) %>% 
+  mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs")) %>% 
+  ggplot(aes(x=Playlist,y=`Average Overall Sentiment`,color=Wrapped,group=Wrapped)) +
+  geom_vline(xintercept = 2019) +
+  geom_line(size=1.5) +
+  geom_point_interactive(aes(tooltip=glue("The overall sentiment of the lyrics of {whose_songs} was {`Average Overall Sentiment`} in {Playlist}")),
+                         size=5) +
+  geom_hline(yintercept = 0,linetype="dashed") +
+  scale_color_manual(values = c("#1DB954","#A9A9A9")) +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  guides(color="none") +
+  labs(title="Overall sentiment of <span style='color: #1DB954'>**my**</span> music versus <span style='color: #A9A9A9'>**popular**</span> music",
+       subtitle = "Using Afinn Lexicon") +
+  theme(plot.title = element_markdown(size = rel(1.25)),
+        axis.title.x = element_blank(),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(colour = "grey70"))
+```
+
+## Difference in Difference
+
+```{r Diff in diff, fig.cap="Test", fig.align='center', echo=F,warning=F,message=F}
+Feats_Data <- Full_Comparison %>% 
+  select(Wrapped,Playlist,`Median Danceability`:`Percent in Major`,
+         `Average Words Per Song`,
+         `Percent of Songs That Are Explicit`) %>% 
+  pivot_longer(`Median Danceability`:`Percent of Songs That Are Explicit`,names_to="Feature") %>% 
+  mutate(whose_songs=ifelse(Wrapped=="Yes", "my songs", "popular songs"))
+
+
+ diff_in_diff_Feats_Data <- Feats_Data %>% 
+  select(-whose_songs) %>% 
+  pivot_wider(names_from = Wrapped, values_from=value) %>%
+  filter(Playlist>=2019) %>% 
+  mutate(per_diff=(Yes-No)/Yes*100) %>% #Percent diff between my music and popular music
+  select(-Yes,-No) %>%
+  pivot_wider(names_from=Playlist, values_from = per_diff) %>% 
+  mutate(diff_in_diff=(`2020`-`2019`)/`2020`*100)   #Percent change in the difference between my music and popular music
+ 
+ diff_in_diff_Feats_Data <- diff_in_diff_Feats_Data %>% 
+   mutate(up_or_down=ifelse(diff_in_diff>=0,"up","down"))
+ 
+ 
+ diff_in_diff_Feats_Data_plot <- diff_in_diff_Feats_Data %>% 
+  ggplot(aes(x=fct_reorder(Feature,diff_in_diff),y=diff_in_diff)) +
+  geom_col_interactive(aes(tooltip=str_wrap(glue("The difference in {tolower(Feature)} between my music and popular music \nwent {up_or_down}  by {round(diff_in_diff,2)}% between 2019 and 2020"),25)),
+                       fill="#1DB954") +
+  labs(x=NULL,
+       y="Difference in Difference") +
+  coord_flip() 
+
+#girafe(ggobj = diff_in_diff_Feats_Data_plot)
+
+
+# Genres ------------------------------------------------------------------
+diff_in_diff_genre <- Full_Comparison %>% 
+  select(Wrapped, Playlist,`Percent Hip Hop`,`Percent Pop`,
+         `Percent Rap`, `Percent Trap`, `Percent Country`,
+         `Percent Rock`, `Percent R&B`, 
+         `Percent Other`) %>% 
+  pivot_longer(cols=`Percent Hip Hop`:`Percent Other`,
+               names_to="Genre",
+               values_to="Percent") %>% 
+  filter(Playlist>=2019) %>% 
+  pivot_wider(names_from = Wrapped,values_from = Percent) %>%
+  mutate(diff=(Yes-No)) %>% #Diff between my music and popular music. So in 2019, 15.1 percentage points more songs in my music were hip hop compared to popular music
+  select(-Yes,-No) %>%
+  pivot_wider(names_from=Playlist, values_from = diff) %>% 
+  mutate(diff_in_diff=(`2020`-`2019`))   #Change in the difference between my music and popular music from 2019 to 2020
+
+diff_in_diff_genre <- diff_in_diff_genre %>% 
+  mutate(up_or_down=ifelse(diff_in_diff>=0,"up","down"),
+         Genre=str_remove(Genre,"Percent "))
+
+diff_in_diff_genre_plot <- diff_in_diff_genre %>% 
+  ggplot(aes(x=fct_reorder(Genre,diff_in_diff),y=diff_in_diff)) +
+  geom_col_interactive(aes(tooltip=str_wrap(glue("The difference in percent of songs in the {tolower(Genre)} genre between my music and popular music \nwent {up_or_down}  by {round(diff_in_diff,2)} percentage points between 2019 and 2020"),25)),
+                       fill="#1DB954") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  labs(x=NULL,
+       y="Difference in Difference") +
+  coord_flip() 
+
+#girafe(ggobj = diff_in_diff_genre_plot)
+
+
+# Sentiments --------------------------------------------------------------
+sentiments <- Full_Comparison %>% 
+  select(Wrapped,Playlist,
+         `Percent of Words in Trust Category`:`Percent of Words in Anticipation Category`)
+names(sentiments) <- names(sentiments) %>% 
+  str_replace("Percent of Words in ","") %>% 
+  str_replace(" Category","")
+
+sentiments_diff_in_diff <- sentiments %>% 
+  pivot_longer(cols=Trust:Anticipation,
+               names_to="Sentiment",
+               values_to="Percent") %>% 
+  filter(Playlist>=2019) %>% 
+  pivot_wider(names_from = Wrapped,values_from = Percent) %>%
+  mutate(diff=(Yes-No)) %>% #Diff between my music and popular music. So in 2019, 15.1 percentage points more songs in my music were hip hop compared to popular music
+  select(-Yes,-No) %>%
+  pivot_wider(names_from=Playlist, values_from = diff) %>% 
+  mutate(diff_in_diff=(`2020`-`2019`)) 
+
+sentiments_diff_in_diff <- sentiments_diff_in_diff %>% 
+  mutate(up_or_down=ifelse(diff_in_diff>=0,"up","down"))
+
+sentiments_diff_in_diff_plot <- sentiments_diff_in_diff %>% 
+  ggplot(aes(x=fct_reorder(Sentiment,diff_in_diff),y=diff_in_diff)) +
+  geom_col_interactive(aes(tooltip=str_wrap(glue("The difference in percent of words in the {tolower(Sentiment)} sentiment category between my music and popular music \nwent {up_or_down}  by {round(diff_in_diff,2)} percentage points between 2019 and 2020"),25)),
+                       fill="#1DB954") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  labs(x=NULL,
+       y="Difference in Difference") + #\n(Percentage point change in difference from 2019 to 2020)
+  coord_flip() 
+
+#girafe(ggobj = sentiments_diff_in_diff_plot)
+
+# Joined Plot -------------------------------------------------------------
+
+Joined_plot <- diff_in_diff_Feats_Data_plot + diff_in_diff_genre_plot + sentiments_diff_in_diff_plot + plot_layout(ncol = 2) + plot_annotation(title="2019 to 2020 change in the difference between my music and \npopular music across key metrics")
+#diff_in_diff_Feats_Data_plot / (sentiments_diff_in_diff_plot | diff_in_diff_genre_plot)
+
+
+girafe(ggobj = Joined_plot)
+```
 
 # Modeling
 
